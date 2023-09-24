@@ -25,6 +25,7 @@ __global__ void cube_add(double *a, double *b, double *c, int N_i, int N_j, int 
         for ( int i = index_i; i<N_i; i+=strid_i ){
         	for ( int j = index_j; j<N_j; j+=strid_j ){
         		for ( int k = index_k; k<N_k; k+=strid_k ){
+				for ( int m=0; m<100; m++ )
 				c[i*N_j*N_k+j*N_k+k] = a[i*N_j*N_k+j*N_k+k] + b[i*N_j*N_k+j*N_k+k];
 				//c[i+j*N_i+k*N_i*N_j] = a[i+j*N_i+k*N_i*N_j] + b[i+j*N_i+k*N_i*N_j];
 				//total_does++;
@@ -55,7 +56,7 @@ __global__ void cube_minus(double *a, double *b, double *c, int N_i, int N_j, in
 		}
 	}
 
-	printf("one thread runs %d times. \n", total_does);
+	//printf("one thread runs %d times. \n", total_does);
 }
 
 __global__ void cube_product(double *a, double *b, double *c, int N_i, int N_j, int N_k) { 
@@ -171,10 +172,15 @@ void kernel_wrapper_(double *a, double *b, double *c, int *pN_i, int *pN_j, int 
 
 int main()
 {
-	int N_i = 2, N_j=3, N_k=4;
+	//int N_i = 2, N_j=3, N_k=4;
+	//int N_i = 2, N_j=3, N_k=4;
+	int N_i = 200, N_j=300, N_k=400;
+
+	/*
 	double a[N_i][N_j][N_k];
 	double b[N_i][N_j][N_k];
 	double c[N_i][N_j][N_k];
+	*/
 
 	double *pa, *pb, *pc;
 
@@ -197,13 +203,13 @@ int main()
 				pa[i+j*N_i+k*N_i*N_j] = i + j*N_i + k *N_j * N_i;
 				pb[i+j*N_i+k*N_i*N_j] = i + j*N_i + k *N_j * N_i;
 				pc[i+j*N_i+k*N_i*N_j] = 0;
-				printf("a[%d][%d][%d]=%f\n",i,j,k,pc[i+j*N_i+k*N_i*N_j]);
+				//printf("a[%d][%d][%d]=%f\n",i,j,k,pc[i+j*N_i+k*N_i*N_j]);
 			}
 		}
 	}
 
 
-	printf("Tsize = %d, sizeof(a) =%d \n", Tsize, sizeof(a) );
+	//printf("Tsize = %d, sizeof(a) =%d \n", Tsize, sizeof(a) );
 
         //pa = (double*)calloc(N_i * N_j * N_k, sizeof(double));
         //pb = (double*)calloc(N_i * N_j * N_k, sizeof(double));
@@ -217,13 +223,15 @@ int main()
 
 	char Operator = '+';
 	clock_t start = clock();
+
+	printf("Time elapsed: %f\n", ((double)clock() - start) / CLOCKS_PER_SEC);
 	kernel_wrapper_((double *)pa,(double *)pb,(double *)pc, &N_i, &N_j, &N_k, &Operator);
 	printf("Time elapsed: %f\n", ((double)clock() - start) / CLOCKS_PER_SEC);
 
 	for ( int i=0; i<N_i; i++) {
 		for ( int j=0; j<N_j; j++){
 			for ( int k=0; k<N_k; k++){
-				printf("c[%d][%d][%d]=%f\n",i,j,k,pc[i+j*N_i+k*N_j*N_i]);
+				//printf("c[%d][%d][%d]=%f\n",i,j,k,pc[i+j*N_i+k*N_j*N_i]);
 			}
 		}
 	}
