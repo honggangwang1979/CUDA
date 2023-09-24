@@ -11,7 +11,7 @@ __global__ void vect_add(float *a, float *b, int N) {
 	int idx = threadIdx.x; if (idx<N) a[idx] = a[idx] + b[idx]; 
 } 
 
-__global__ void cube_add(double *a, double *b, double *c, int N_i, int N_j, int N_k) { 
+__global__ void cube_add(double *a, double *b, double *c, int N_i, int N_j, int N_k, int M ) { 
 	int index_i = blockIdx.x*blockDim.x + threadIdx.x; 
 	int index_j = blockIdx.y*blockDim.y + threadIdx.y;
 	int index_k = blockIdx.z*blockDim.z + threadIdx.z;
@@ -25,8 +25,8 @@ __global__ void cube_add(double *a, double *b, double *c, int N_i, int N_j, int 
         for ( int i = index_i; i<N_i; i+=strid_i ){
         	for ( int j = index_j; j<N_j; j+=strid_j ){
         		for ( int k = index_k; k<N_k; k+=strid_k ){
-				for ( int m=0; m<100; m++ )
-				c[i*N_j*N_k+j*N_k+k] = a[i*N_j*N_k+j*N_k+k] + b[i*N_j*N_k+j*N_k+k];
+				for ( int m=0; m<M; m++ )
+					c[i*N_j*N_k+j*N_k+k] = a[i*N_j*N_k+j*N_k+k] + b[i*N_j*N_k+j*N_k+k];
 				//c[i+j*N_i+k*N_i*N_j] = a[i+j*N_i+k*N_i*N_j] + b[i+j*N_i+k*N_i*N_j];
 				//total_does++;
 			}
@@ -87,7 +87,7 @@ __global__ void cube_product(double *a, double *b, double *c, int N_i, int N_j, 
 // function called from main fortran program extern "C" 
 // this following line works for the main() commented by the end of this code
 //extern "C" void kw_simple_3d_opr_(double *a, double *b, double *c, int *pN_i, int *pN_j, int *pN_k, char *pOperator) 
-void kernel_wrapper_(double *a, double *b, double *c, int *pN_i, int *pN_j, int *pN_k, char *pOperator) 
+void kernel_wrapper_(double *a, double *b, double *c, int *pN_i, int *pN_j, int *pN_k, char *pOperator, int *pM) 
 { 
 
 	clock_t start = clock();
@@ -100,6 +100,7 @@ void kernel_wrapper_(double *a, double *b, double *c, int *pN_i, int *pN_j, int 
 	int N_i = *pN_i; 
 	int N_j = *pN_j; 
 	int N_k = *pN_k; 
+	int M = *pM; 
 	char Operator = *pOperator;
         
         gridDim_x = N_i%blockDim_x == 0 ? N_i/blockDim_x: N_i/blockDim_x +1;
@@ -144,7 +145,7 @@ void kernel_wrapper_(double *a, double *b, double *c, int *pN_i, int *pN_j, int 
 	switch ( Operator ){
 		case '+':
         		//cube_add<<<grid, block>>>( a_d, b_d, c_d, N_i, N_j, N_k); 
-        		cube_add<<<grid, block>>>( a, b, c, N_i, N_j, N_k); 
+        		cube_add<<<grid, block>>>( a, b, c, N_i, N_j, N_k, M); 
 			break;
 		case '-':
         		//cube_minus<<<grid, block>>>( a_d, b_d, c_d, N_i, N_j, N_k); 
@@ -170,11 +171,13 @@ void kernel_wrapper_(double *a, double *b, double *c, int *pN_i, int *pN_j, int 
 	return; 
 } 
 
-int main()
+
+int main(int argc, char *argv[])
 {
 	//int N_i = 2, N_j=3, N_k=4;
-	//int N_i = 2, N_j=3, N_k=4;
-	int N_i = 200, N_j=300, N_k=400;
+	int N_i = 2, N_j=3, N_k=4;
+	int M=1;
+	//int N_i = 200, N_j=300, N_k=400;
 
 	/*
 	double a[N_i][N_j][N_k];
@@ -183,6 +186,19 @@ int main()
 	*/
 
 	double *pa, *pb, *pc;
+
+	if( argc != 5 ){
+                printf( "Usage: fds_3d_cpu N_i N_j N_k M\n");
+                printf( "Use default arguments:\n");
+                printf( "N_i=%d, N_j=%d, N_k=%d, M=%d\n", N_i, N_j, N_k, M );
+        }else{
+                N_i = atoi(argv[1]);
+                N_j = atoi(argv[2]);
+                N_k = atoi(argv[3]);
+                M   = atoi(argv[4]);
+                printf( "N_i=%d, N_j=%d, N_k=%d, M=%d\n", N_i, N_j, N_k, M );
+        }
+
 
 	int Tsize = N_i * N_j *N_k * sizeof(double);
 
@@ -225,16 +241,21 @@ int main()
 	clock_t start = clock();
 
 	printf("Time elapsed: %f\n", ((double)clock() - start) / CLOCKS_PER_SEC);
-	kernel_wrapper_((double *)pa,(double *)pb,(double *)pc, &N_i, &N_j, &N_k, &Operator);
+	kernel_wrapper_((double *)pa,(double *)pb,(double *)pc, &N_i, &N_j, &N_k, &Operator, &M);
 	printf("Time elapsed: %f\n", ((double)clock() - start) / CLOCKS_PER_SEC);
 
-	for ( int i=0; i<N_i; i++) {
-		for ( int j=0; j<N_j; j++){
-			for ( int k=0; k<N_k; k++){
-				//printf("c[%d][%d][%d]=%f\n",i,j,k,pc[i+j*N_i+k*N_j*N_i]);
-			}
-		}
-	}
+	double Terror = 0.0;
+
+        for ( int i=0; i<N_i; i++) {
+                for ( int j=0; j<N_j; j++){
+                        for ( int k=0; k<N_k; k++){
+                                Terror += pc[i+j*N_i+k*N_j*N_i] - (pa[i+j*N_i+k*N_j*N_i] + pb[i+j*N_i+k*N_j*N_i]);
+                        }
+                }
+        }
+
+        printf("Total error=%f\n",Terror);
+
 
 	cudaFree(pa);
 	cudaFree(pb);
