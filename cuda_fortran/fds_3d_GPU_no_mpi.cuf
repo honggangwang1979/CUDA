@@ -1,0 +1,148 @@
+!
+! Copyright 2003-2013 Intel Corporation.  All Rights Reserved.
+!
+! The source code contained or described herein and all documents
+! related to the source code ("Material") are owned by Intel Corporation
+! or its suppliers or licensors.  Title to the Material remains with
+! Intel Corporation or its suppliers and licensors.  The Material is
+! protected by worldwide copyright and trade secret laws and treaty
+! provisions.  No part of the Material may be used, copied, reproduced,
+! modified, published, uploaded, posted, transmitted, distributed, or
+! disclosed in any way without Intel's prior express written permission.
+!
+! No license under any patent, copyright, trade secret or other
+! intellectual property right is granted to or conferred upon you by
+! disclosure or delivery of the Materials, either expressly, by
+! implication, inducement, estoppel or otherwise.  Any license under
+! such intellectual property rights must be express and approved by
+! Intel in writing.
+!
+
+
+module fds_CUF
+
+implicit none
+
+contains
+  attributes(global) subroutine cube_add(a, b, c, N_i, N_j, N_k)
+
+        implicit none 
+
+        real*8 :: a(N_i,N_j,N_k),b(N_i,N_j,N_k),c(N_i,N_j,N_k)
+        integer*4, value :: N_i, N_j, N_k
+
+        integer*4 :: i, j, k
+        integer*4 :: idx_i, idx_j, idx_k
+        integer*4 :: strid_i, strid_j, strid_k
+        integer*4 :: total_does 
+
+        !blockIdx%x starts from 1, which is different from cuda c/c++ code
+        idx_i = (blockIdx%x-1) * blockDim%x + threadIdx%x
+        idx_j = (blockIdx%y-1) * blockDim%y + threadIdx%y
+        idx_k = (blockIdx%z-1) * blockDim%z + threadIdx%z
+
+        strid_i = blockDim%x * gridDim%x
+        strid_j = blockDim%y * gridDim%y
+        strid_k = blockDim%z * gridDim%z
+
+ 	DO i=idx_i,N_i, strid_i 
+ 		DO j=idx_j,N_j, strid_j 
+ 			DO k=idx_k,N_k, strid_k 
+                        	c(i,j,k) = a(i,j,k) + b(i,j,k)	
+                                total_does=total_does+1
+			End DO
+		End DO
+	End DO
+        !print *, 'total_does =', total_does
+  end subroutine cube_add
+
+  subroutine kw_simple_3d_opr_(a, b, c, N_i, N_j, N_k,Op)
+    use cudafor
+    implicit none
+
+    real*8 :: a(N_i,N_j,N_k), b(N_i,N_j,N_k), c(N_i,N_j,N_k)
+    real*8, device :: D_a(N_i,N_j,N_k), D_b(N_i,N_j,N_k), D_c(N_i,N_j,N_k)
+
+    integer :: N_i, N_j, N_k, istat
+    character, value :: op
+
+    integer*4 ::  blockDim_x=16, blockDim_y=16, blockDim_z=4
+    integer*4 :: gridDim_x, gridDim_y, gridDim_z
+
+    type(dim3) :: grid, block
+    type(cudaEvent) :: start, stop
+
+    gridDim_x = N_i/blockDim_x + 1
+    gridDim_y = N_j/blockDim_y + 1
+    gridDim_z = N_k/blockDim_z + 1
+
+
+    grid = dim3(gridDim_x, gridDim_y, gridDim_z)
+    block= dim3(blockDim_x, blockDim_y, blockDim_z)
+
+    D_a = a
+    D_b = b
+    D_c = c
+
+    !istat = cudaEventRecord(start,0)
+    call cube_add<<<grid,block>>>(D_a, D_b, D_c, N_i, N_j, N_k)
+    !istat = cudaEventRecord(stop,0)
+    istat = cudaDeviceSynchronize()
+
+    c = D_c
+  end subroutine kw_simple_3d_opr_
+
+
+  Subroutine test_gpu()
+
+   IMPLICIT NONE
+
+   integer*4 :: i,j,k 
+
+   integer*4, parameter :: N=8 , N_i=2, N_j=3, N_k=4
+   !integer*4, parameter :: N=8 , N_i=20, N_j=30, N_k=40
+   !integer*4, parameter :: N=8 , N_i=200, N_j=30, N_k=40
+   !real*4, Dimension(N) :: a, b
+
+   real*8, Dimension(N_i,N_j,N_k) :: a, b, c
+    ! real*8, Dimension(N_i,N_j,N_k,2) :: b_test
+
+   DO i=1,N_i 
+          Do j=1,N_j
+                  Do k=1,N_k
+	                a(i,j,k)=i+(j-1)*N_i+(k-1)*N_i*N_j
+	                b(i,j,k)=a(i,j,k)
+	                c(i,j,k)=a(i,j,k)
+                         
+!                        b_test(i,j,k,1)=a(i,j,k)
+!                        b_test(i,j,k,2)=a(i,j,k)
+                        print *, 'before : i=',i,' j=',j, ' k=',k, 'a(i,j,k)=', a(i,j,k)
+                  END DO 
+          END DO 
+   END DO 
+
+  !c = 0.0
+  !CALL kw_simple_3d_opr_(a, b_test(:,:,:,2), c, N_i, N_j, N_k,'+')
+  CALL kw_simple_3d_opr_(a, b, c, N_i, N_j, N_k,'+')
+
+   DO i=1,N_i 
+          Do j=1,N_j
+                  Do k=1,N_k
+                          print *, 'After: i=',i,' j=',j, ' k=',k, 'c(i,j,k)=', c(i,j,k)
+                  END DO 
+          END DO 
+   END DO 
+
+
+  END subroutine
+
+end module 
+
+program test_no_mpi
+	use fds_CUF
+        implicit none
+
+        integer i, size, rank, namelen, ierr
+
+        call test_gpu()
+end
