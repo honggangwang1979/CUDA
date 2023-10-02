@@ -1,0 +1,21 @@
+   	integer*4 :: M=8 , N_i=2, N_j=3, N_k=4,T_steps=10, stat
+
+        integer :: argc, ix
+        character (len=16), dimension(:), allocatable  :: argv
+
+        real :: e, etime, t(2)
+
+        call GetArg(argc, argv)
+
+        if ( argc == 5 ) then
+                call str2int(argv(1), N_i,stat )
+                call str2int(argv(2), N_j ,stat)
+                call str2int(argv(3), N_k ,stat)
+                call str2int(argv(4), M ,stat)
+                call str2int(argv(5), T_steps ,stat)
+                print*, N_i, N_j, N_k, M, T_steps
+        else
+                print*, "Use default arguments:", N_i, N_j, N_k, M, T_steps
+        endif
+
+

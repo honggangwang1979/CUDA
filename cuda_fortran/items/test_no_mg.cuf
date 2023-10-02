@@ -1,0 +1,31 @@
+module kernels
+ integer, parameter :: n = 1024
+contains
+ attributes(global) subroutine increment(a)
+ integer :: a(*), i
+ i = (blockIdx%x-1)*blockDim%x + threadIdx%x
+ if (i <= n) a(i) = a(i)+1
+ end subroutine increment
+end module kernels
+
+program test_no_Managed
+ use kernels
+ use cudafor
+ integer :: a(n)
+ integer, device :: d_a(n)
+ integer :: istat
+ real e, etime, t(2)
+
+ a = 4
+ 
+ e = etime(t)
+ print *, 'Time elapsed before kernal :', e, ',user:', t(1), ', sys:', t(2)
+ d_a = a
+ call increment<<<1,n>>>(d_a)
+ istat = cudaDeviceSynchronize()
+ a = d_a
+ e = etime(t)
+ print *, 'Time elapsed before kernal :', e, ',user:', t(1), ', sys:', t(2)
+
+ if (all(a==5)) print *, 'OK'
+end program test_no_Managed

@@ -1,0 +1,8 @@
+ test_fortran after kernal cpu time :    1435.470    
+ test_gpu after kernal cpu time :    110.0748    
+ test_gpu_mg after kernal cpu time :    75.77109    
+ test_gpu_mg_auto after kernal cpu time :    68.58576    
+ test_device after kernal cpu time :    75.15085    
+ test_device_auto after kernal cpu time :    68.03423    
+ test_acc after kernal cpu time :    91.16217    
+ test_omp after kernal cpu time :    557.9612    
